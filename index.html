@@ -70,6 +70,8 @@ body{font-family:var(--body);direction:rtl;margin:0;overflow-x:hidden;-webkit-fo
 .print{width:min(100%,420px);background:var(--paper);padding:12px 12px 0;border-radius:3px;box-shadow:0 22px 50px -12px rgba(0,0,0,.65),0 2px 0 rgba(255,255,255,.04);transform:rotate(var(--r,0deg));transition:transform .5s ease,opacity .9s ease,translate .9s ease;cursor:zoom-in;position:relative}
 .print.hide{opacity:0;translate:0 40px}
 .print:hover{transform:rotate(0deg) scale(1.01)}
+.print.focus{transform:rotate(0deg) scale(1.01)}
+.print.lift{transform:rotate(0deg) scale(1.04);box-shadow:0 30px 60px -10px rgba(0,0,0,.75),0 0 0 1px rgba(234,183,174,.25);transition:transform .25s ease,box-shadow .25s ease}
 .print .ph{position:relative;width:100%;background:#e9dfd6;overflow:hidden;border-radius:1px}
 .print .ph::before{content:"";display:block;padding-top:var(--ratio,133%)}
 .print img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0;transition:opacity .8s}
@@ -287,6 +289,7 @@ function open(meta) {
 
   const reel = document.getElementById('reel');
   const io = new IntersectionObserver(es => es.forEach(e => { if (e.isIntersecting) { e.target.classList.remove('hide'); io.unobserve(e.target); } }), {threshold: .15});
+  const mid = new IntersectionObserver(es => es.forEach(e => e.target.classList.toggle('focus', e.isIntersecting)), {rootMargin: '-38% 0px -38% 0px'});
   P.imgs.forEach((im, i) => {
     if (chapters[i]) { const h = document.createElement('div'); h.className = 'chapter'; h.textContent = chapters[i]; reel.appendChild(h); }
     const f = document.createElement('figure'); f.className = 'print hide';
@@ -296,7 +299,10 @@ function open(meta) {
     f.querySelector('p').textContent = caps[i] || '';
     f.querySelector('img').alt = caps[i] || '';
     f.addEventListener('click', () => view(i));
-    reel.appendChild(f); io.observe(f);
+    f.addEventListener('touchstart', () => f.classList.add('lift'), {passive: true});
+    const drop = () => setTimeout(() => f.classList.remove('lift'), 120);
+    f.addEventListener('touchend', drop); f.addEventListener('touchcancel', drop);
+    reel.appendChild(f); io.observe(f); mid.observe(f);
   });
   (async () => {
     const figs = reel.querySelectorAll('.print img');
