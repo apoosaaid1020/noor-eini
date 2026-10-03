@@ -163,7 +163,7 @@ body{font-family:var(--body);direction:rtl;margin:0;overflow-x:hidden;-webkit-fo
   </footer>
 </main>
 
-<audio id="song" preload="auto" loop playsinline></audio>
+<audio id="song" preload="auto" playsinline></audio>
 <button id="music" type="button" aria-label="إيقاف الأغنية" hidden><span class="bars"><i></i><i></i><i></i><i></i></span><span class="name" id="mName">سرك إيه 🎶</span></button>
 
 <div id="viewer" hidden>
@@ -236,17 +236,31 @@ function press(k) {
 /* ---- music ---- */
 const song = document.getElementById('song'), mBtn = document.getElementById('music');
 const SILENT = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=';
+const TRACKS = ['song.bin', 'song2.bin'], tUrls = [];
+let tIdx = 0, started = false;
+async function loadTrack(i) {
+  if (tUrls[i]) return tUrls[i];
+  const r = await fetch(TRACKS[i]); const all = new Uint8Array(await r.arrayBuffer());
+  const buf = await crypto.subtle.decrypt({name: 'AES-GCM', iv: all.slice(0, 12)}, KEY, all.slice(12));
+  return tUrls[i] = URL.createObjectURL(new Blob([buf], {type: 'audio/mpeg'}));
+}
 async function startSong() {
-  try {
-    const r = await fetch('song.bin'); const all = new Uint8Array(await r.arrayBuffer());
-    const buf = await crypto.subtle.decrypt({name: 'AES-GCM', iv: all.slice(0, 12)}, KEY, all.slice(12));
-    song.src = URL.createObjectURL(new Blob([buf], {type: 'audio/mpeg'}));
-  } catch (e) { mBtn.hidden = false; mBtn.classList.add('off'); return; }
+  try { song.src = await loadTrack(0); tIdx = 0; started = true; }
+  catch (e) { mBtn.hidden = false; mBtn.classList.add('off'); return; }
   song.muted = false;
   const pr = song.play(); if (pr) pr.catch(() => mBtn.classList.add('off'));
   mBtn.hidden = false;
   setTimeout(() => document.getElementById('mName').classList.add('fade'), 4000);
+  loadTrack(1).catch(() => {});
 }
+// when a song ends, go straight to the next one (after the last, back to the first)
+song.addEventListener('ended', async () => {
+  if (!started || song.src.startsWith('data:')) return; // ignore the silent warm-up clip
+  const n = (tIdx + 1) % TRACKS.length;
+  try { song.src = await loadTrack(n); tIdx = n; } catch (e) { song.currentTime = 0; }
+  song.muted = false;
+  const pr = song.play(); if (pr) pr.catch(() => mBtn.classList.add('off'));
+});
 song.addEventListener('pause', () => { mBtn.classList.add('off'); mBtn.setAttribute('aria-label', 'تشغيل الأغنية'); });
 song.addEventListener('play', () => { if (!song.muted) { mBtn.classList.remove('off'); mBtn.setAttribute('aria-label', 'إيقاف الأغنية'); } });
 mBtn.addEventListener('click', () => { if (!song.src || song.src.startsWith('data:')) { startSong(); return; } if (song.paused) { song.muted = false; song.play().catch(() => {}); } else song.pause(); });
