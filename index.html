@@ -236,7 +236,7 @@ function press(k) {
 /* ---- music ---- */
 const song = document.getElementById('song'), mBtn = document.getElementById('music');
 const SILENT = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=';
-const TRACKS = ['song.bin', 'song2.bin'], tUrls = [];
+const TRACKS = ['voice.bin', 'song.bin', 'song2.bin'], NAMES = ['رسالة مني 🎙️', 'سرك إيه 🎶', ''], tUrls = [];
 let tIdx = 0, started = false;
 async function loadTrack(i) {
   if (tUrls[i]) return tUrls[i];
@@ -244,20 +244,28 @@ async function loadTrack(i) {
   const buf = await crypto.subtle.decrypt({name: 'AES-GCM', iv: all.slice(0, 12)}, KEY, all.slice(12));
   return tUrls[i] = URL.createObjectURL(new Blob([buf], {type: 'audio/mpeg'}));
 }
+let nameTimer;
+function showName(i) {
+  const el = document.getElementById('mName'); clearTimeout(nameTimer);
+  if (!NAMES[i]) { el.classList.add('fade'); return; }
+  el.textContent = NAMES[i]; el.classList.remove('fade');
+  nameTimer = setTimeout(() => el.classList.add('fade'), 4000);
+}
 async function startSong() {
   try { song.src = await loadTrack(0); tIdx = 0; started = true; }
   catch (e) { mBtn.hidden = false; mBtn.classList.add('off'); return; }
   song.muted = false;
   const pr = song.play(); if (pr) pr.catch(() => mBtn.classList.add('off'));
   mBtn.hidden = false;
-  setTimeout(() => document.getElementById('mName').classList.add('fade'), 4000);
-  loadTrack(1).catch(() => {});
+  showName(0);
+  loadTrack(1).catch(() => {}); loadTrack(2).catch(() => {});
 }
 // when a song ends, go straight to the next one (after the last, back to the first)
 song.addEventListener('ended', async () => {
   if (!started || song.src.startsWith('data:')) return; // ignore the silent warm-up clip
-  const n = (tIdx + 1) % TRACKS.length;
-  try { song.src = await loadTrack(n); tIdx = n; } catch (e) { song.currentTime = 0; }
+  // voice first, then the two songs; after the last song go back to the first song (not the voice)
+  const n = tIdx + 1 < TRACKS.length ? tIdx + 1 : 1;
+  try { song.src = await loadTrack(n); tIdx = n; showName(n); } catch (e) { song.currentTime = 0; }
   song.muted = false;
   const pr = song.play(); if (pr) pr.catch(() => mBtn.classList.add('off'));
 });
